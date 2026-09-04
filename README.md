@@ -29,7 +29,7 @@ simulated second. If any number goes outside `perf/budget.json`, the build fails
 
 | Check | Measured | Budget | |
 |---|---:|---:|:--:|
-| Packaged size | 80.7 KB | 100 KB | pass |
+| Packaged size | 80.6 KB | 100 KB | pass |
 | Bundled libraries | 0 | 0 | pass |
 | Widget calls per frame | 0 | 0 | pass |
 | Widget calls per second while idle | 0 | 0 | pass |
@@ -43,7 +43,7 @@ Scenarios driven against the real addon source, outside the game:
 | hovering items, 1 tooltip/sec | 0.00 | 18.0 | 18 calls per tooltip, icon and item ID both on |
 | idle, tooltip on screen | 0.00 | - | 0 OnUpdate handlers installed; the cursor is followed by the client |
 
-<sub>2,202 lines of Lua · 80.7 KB packaged · no bundled libraries</sub>
+<sub>2,202 lines of Lua · 80.6 KB packaged · no bundled libraries</sub>
 
 <!-- perf:end -->
 
