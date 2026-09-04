@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: PeaversToolTip
+  description: "A World of Warcraft addon that reskins the game's tooltips as a flat black box, colours their border by item quality or unit reaction, and anchors them where you want them."
+  annotations:
+    github.com/project-slug: peavers-warcraft/PeaversToolTip
+spec:
+  type: library
+  lifecycle: production
+  owner: peavers-warcraft

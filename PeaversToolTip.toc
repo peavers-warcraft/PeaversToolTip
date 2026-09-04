@@ -1,0 +1,32 @@
+## Interface: 120001, 120005, 120007, 120100
+
+## Title: |cff3abdf7Peavers|rToolTip
+## Notes: Flat black-box tooltips with a hairline border that colours itself by item quality or unit reaction
+## Author: Peavers
+## Version: 1.0.0
+
+## IconTexture: Interface\AddOns\PeaversCommons\src\Media\Icon.tga
+## Category-enUS: Peavers
+
+## X-Website: https://peavers.io
+## X-Source-Code: https://github.com/peavers-warcraft/PeaversToolTip
+## X-Curse-Project-ID: 1680982
+
+## Dependencies: PeaversCommons, PeaversConfig
+## SavedVariables: PeaversToolTipDB
+
+Changelog.lua
+
+src\Utils\Config.lua
+src\Utils\Secret.lua
+src\Utils\Patrons.lua
+
+src\Core\Registry.lua
+src\Core\Skin.lua
+src\Core\Anchor.lua
+src\Core\HealthBar.lua
+src\Core\Content.lua
+
+src\Utils\ConfigUI.lua
+
+src\Main.lua
