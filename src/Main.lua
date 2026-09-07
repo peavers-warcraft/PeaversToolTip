@@ -88,6 +88,11 @@ PeaversCommons.Events:Init(addonName, function()
     PTT.Anchor:Initialize()
     PTT.HealthBar:Initialize()
 
+    -- After Skin and Anchor, whose state the settings drive.
+    if PTT.EditMode then
+        PTT.EditMode:Register()
+    end
+
     if PTT.ConfigUI and PTT.ConfigUI.Initialize then
         PTT.ConfigUI:Initialize()
     end

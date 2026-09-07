@@ -28,5 +28,6 @@ src\Core\HealthBar.lua
 src\Core\Content.lua
 
 src\Utils\ConfigUI.lua
+src\Utils\EditMode.lua
 
 src\Main.lua
