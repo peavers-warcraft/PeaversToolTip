@@ -9,12 +9,14 @@ if not PeaversCommons then
     return
 end
 
+local ConfigUIUtils = PeaversCommons.ConfigUIUtils
+
 -- Applying a setting lives with the addon's schema now, in EditMode.lua, so the
 -- settings page and the Edit Mode panel cannot disagree about what a change
 -- should do.
 
 function ConfigUI:BuildInfoPage(parentFrame)
-    PeaversCommons.ConfigUIUtils.BuildInfoPage(parentFrame, "ToolTip", {
+    ConfigUIUtils.BuildInfoPageWithEditMode(parentFrame, "ToolTip", {
         "Redraws the game's tooltips as a flat black box with a 1px border, and " ..
             "puts that border to work: it carries the item's quality or the " ..
             "unit's class and reaction, so the colour tells you what you are " ..
@@ -24,11 +26,6 @@ function ConfigUI:BuildInfoPage(parentFrame)
         { command = "/ptt cursor", desc = "follow the mouse cursor" },
         { command = "/ptt scale N", desc = "set the tooltip scale" },
         { command = "/ptt disable", desc = "give every tooltip back to Blizzard" },
-
-        { header = "Settings are in Edit Mode" },
-        "Open Edit Mode from the game menu and select the tooltip. Everything " ..
-            "is there: the colours and the border, where tooltips appear, the " ..
-            "health bar, and what the tooltip is allowed to add.",
 
         { header = "What it deliberately does not do" },
         "It never removes or rewrites a line the game wrote. A tooltip line " ..
@@ -52,6 +49,16 @@ function ConfigUI:BuildInfoPage(parentFrame)
             "which costs no Lua at all; the health bar updates from the event " ..
             "that changes it. The skin itself is five textures per tooltip, " ..
             "created once and afterwards only recoloured.",
+    }, {
+        title = "the tooltips",
+        select = "the tooltip",
+        reset = function()
+            PTT.Config:Reset()
+            if PTT.ApplySetting then PTT.ApplySetting() end
+            if PeaversCommons.EditModePanel then
+                PeaversCommons.EditModePanel:Refresh()
+            end
+        end,
     })
 end
 
