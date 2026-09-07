@@ -3,13 +3,19 @@ local addonName, PTT = ...
 --------------------------------------------------------------------------------
 -- Edit Mode
 --
--- This addon does not own a frame - it reskins Blizzard's tooltips, and the
--- game tooltip is already a system in Edit Mode with its own position. So the
--- settings attach to that system rather than registering a frame of our own.
+-- The obvious home for these settings was Blizzard's own tooltip system, since
+-- the game tooltip is already a thing you can select in Edit Mode. That does not
+-- work: Enum.EditModeSystem.HudTooltip exists, but the frame carrying it is
+-- GameTooltipDefaultContainer, which Edit Mode shows only while the "HUD
+-- Tooltip" account setting is ticked - and it is off by default. With it off the
+-- system is never selectable, SelectSystem never fires, and settings attached to
+-- it are unreachable. Nothing errors; there is simply nothing to click.
 --
--- Which is also where a person would look for them. Someone who wants the
--- tooltip somewhere else opens Edit Mode and clicks the tooltip; finding
--- everything else about it in the same place is the whole point of this move.
+-- So the addon registers its own anchor instead. It already had one - a mover
+-- you drag to place a fixed tooltip - and it is always there, so the settings
+-- are always reachable whatever Blizzard's toggle says. Dragging it does what it
+-- has always done: sets the fixed spot, for when the tooltip is pinned rather
+-- than following the cursor.
 --------------------------------------------------------------------------------
 
 local PeaversCommons = _G.PeaversCommons
@@ -231,16 +237,60 @@ function EditMode:Register()
     if not PeaversCommons.EditMode or not PeaversCommons.EditMode.available then
         return false
     end
-    if not (Enum and Enum.EditModeSystem and Enum.EditModeSystem.HudTooltip) then
-        return false
-    end
+    if not (PTT.Anchor and PTT.Anchor.GetMover) then return false end
+    if self.registered then return true end
 
-    PeaversCommons.EditMode:RegisterSystem({
-        systemID = Enum.EditModeSystem.HudTooltip,
+    local mover = PTT.Anchor:GetMover()
+
+    PeaversCommons.EditMode:Register({
+        frame = mover,
         name = "Peavers ToolTip",
         schema = self:BuildSchema(),
+        default = {
+            point = "BOTTOMRIGHT",
+            x = -230,
+            y = 230,
+        },
+
+        -- The mover knows how to turn its own position into an anchor point and
+        -- a pair of offsets, including which corner the tooltip should grow
+        -- from, so the position callback hands the job straight back to it.
+        onPositionChanged = function()
+            PTT.Anchor:SavePosition()
+            PTT.ApplySetting()
+        end,
+
+        onEnter = function(frame)
+            -- The mover normally sits at TOOLTIP strata so it floats over
+            -- everything while unlocked. Edit Mode's selection overlay is a
+            -- child of this frame hard-coded to MEDIUM, so left where it is the
+            -- mover covers the overlay meant to be receiving the clicks.
+            frame:SetFrameStrata("MEDIUM")
+            frame:EnableMouse(false)
+            frame:RegisterForDrag()
+            frame:SetScript("OnDragStart", nil)
+            frame:SetScript("OnDragStop", nil)
+            -- Shown whatever the anchor mode is: it is the only handle on this
+            -- addon in Edit Mode, and a tooltip that follows the cursor still
+            -- has colours and a health bar to configure.
+            frame:Show()
+        end,
+
+        onExit = function(frame)
+            frame:SetFrameStrata("TOOLTIP")
+            frame:RegisterForDrag("LeftButton")
+            frame:SetScript("OnDragStart", function(self_) self_:StartMoving() end)
+            frame:SetScript("OnDragStop", function(self_)
+                self_:StopMovingOrSizing()
+                PTT.Anchor:SavePosition()
+            end)
+            -- Back to whatever the unlocked setting says, which also restores
+            -- the mouse and hides it again when locked.
+            PTT.Anchor:SetUnlocked(PTT.Config.anchorUnlocked)
+        end,
     })
 
+    self.registered = true
     return true
 end
 
