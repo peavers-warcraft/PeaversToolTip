@@ -13,6 +13,16 @@
 --     one line. So every game API called from here goes through Secret.Safe,
 --     and every value that might be restricted is checked before it is compared.
 --
+-- Classic Era is the exception. Anniversary and Mists of Pandaria Classic ship
+-- TooltipDataProcessor, but Era 1.15 does not, and there the same moment is
+-- announced the old way: the OnTooltipSetUnit / OnTooltipSetItem /
+-- OnTooltipSetSpell scripts, which fire at the same point in the build. The
+-- fallback at the bottom of the file hooks those and turns what the tooltip can
+-- tell us about itself back into the arguments a post-call would have received,
+-- so both routes end in the same three functions. Exactly one route is installed
+-- per client - on a client that has both, installing both would append every
+-- line twice.
+--
 -- The addon only ever *adds*. It does not remove or rewrite Blizzard's lines.
 -- That is a deliberate limit rather than an oversight: a tooltip line cannot be
 -- deleted once added, only blanked, and a blanked line leaves an empty row where
@@ -228,6 +238,142 @@ function Content:OnSpell(tooltip, data)
 end
 
 --------------------------------------------------------------------------------
+-- The script fallback (Classic Era)
+--
+-- A post-call is handed a data table; a classic script is handed nothing but the
+-- tooltip. So each hook below asks the tooltip what it is describing and packs
+-- the answer into the two fields the handlers above actually read, `id` and
+-- `hyperlink`. One scratch table is reused for that rather than a fresh one per
+-- hover: the handlers read it and let go of it before returning.
+--
+-- The old scripts are less disciplined than post-calls about firing once.
+-- OnTooltipSetItem in particular is known to fire a second time for the same
+-- item without the tooltip being cleared in between, and on a route whose whole
+-- job is appending lines that would print the item ID twice. So each tooltip
+-- remembers what kind of content it has already been given since it was last
+-- cleared, and a repeat is ignored.
+--------------------------------------------------------------------------------
+
+local scratch = {}
+
+-- Weak-keyed so a tooltip nobody references any more is not kept alive by us.
+local hooked = setmetatable({}, { __mode = "k" })
+local filled = setmetatable({}, { __mode = "k" })
+
+local function FirstFill(tooltip, kind)
+    if filled[tooltip] == kind then return false end
+    filled[tooltip] = kind
+    return true
+end
+
+local function ItemIDFromLink(link)
+    if type(link) ~= "string" then return nil end
+    local id = link:match("item:(%d+)")
+    return id and tonumber(id)
+end
+
+local function OnScriptUnit(tooltip)
+    if not FirstFill(tooltip, "unit") then return end
+    -- OnUnit already asks the tooltip for its unit, exactly as it does on the
+    -- post-call route, so there is nothing to translate.
+    Content:OnUnit(tooltip)
+end
+
+local function OnScriptItem(tooltip)
+    if not FirstFill(tooltip, "item") then return end
+
+    local _, link = Safe(tooltip.GetItem, tooltip)
+    link = Secret.Readable(link)
+    local id = ItemIDFromLink(link)
+    if not id then return end
+
+    scratch.id, scratch.hyperlink = id, link
+    Content:OnItem(tooltip, scratch)
+    scratch.id, scratch.hyperlink = nil, nil
+end
+
+local function ShowSpellID(tooltip, id)
+    if type(id) ~= "number" then return end
+    if not FirstFill(tooltip, "spell") then return end
+
+    scratch.id, scratch.hyperlink = id, nil
+    Content:OnSpell(tooltip, scratch)
+    scratch.id = nil
+end
+
+-- GetSpell's shape differs by client: retail returns (name, spellID), Classic
+-- Era returns (name, rank, spellID) with the rank as a string. Taking the third
+-- value when it is a number and the second otherwise reads both correctly.
+local function OnScriptSpell(tooltip)
+    local _, second, third = Safe(tooltip.GetSpell, tooltip)
+    second, third = Secret.Readable(second), Secret.Readable(third)
+    ShowSpellID(tooltip, (type(third) == "number" and third) or second)
+end
+
+-- Auras are the one kind of tooltip that does not reliably announce itself
+-- through OnTooltipSetSpell on the old clients; the post-call route has a
+-- UnitAura type of its own for the same reason. The Set* methods are hooked
+-- instead and the spell is looked up from the same unit, index and filter the
+-- tooltip was just given. If the script does fire as well, FirstFill makes the
+-- second arrival a no-op.
+local function AuraSpellID(unit, index, filter)
+    local getAura = _G.C_UnitAuras and _G.C_UnitAuras.GetAuraDataByIndex
+    if getAura then
+        local aura = Safe(getAura, unit, index, filter)
+        if type(aura) == "table" then return Secret.Readable(aura.spellId) end
+    end
+    if type(_G.UnitAura) == "function" then
+        return Secret.Readable(Safe(function() return select(10, _G.UnitAura(unit, index, filter)) end))
+    end
+    return nil
+end
+
+local AURA_METHODS = {
+    { method = "SetUnitAura" },
+    { method = "SetUnitBuff", filter = "HELPFUL" },
+    { method = "SetUnitDebuff", filter = "HARMFUL" },
+}
+
+local SCRIPTS = {
+    { script = "OnTooltipSetUnit", handler = OnScriptUnit },
+    { script = "OnTooltipSetItem", handler = OnScriptItem },
+    { script = "OnTooltipSetSpell", handler = OnScriptSpell },
+}
+
+local function HookScripts(tooltip)
+    if hooked[tooltip] then return end
+    hooked[tooltip] = true
+
+    if type(tooltip.HookScript) ~= "function" or type(tooltip.HasScript) ~= "function" then
+        return
+    end
+
+    for _, entry in ipairs(SCRIPTS) do
+        local ok, has = pcall(tooltip.HasScript, tooltip, entry.script)
+        if ok and has then
+            pcall(tooltip.HookScript, tooltip, entry.script, entry.handler)
+        end
+    end
+
+    for _, entry in ipairs(AURA_METHODS) do
+        if type(tooltip[entry.method]) == "function" then
+            local defaultFilter = entry.filter
+            hooksecurefunc(tooltip, entry.method, function(self_, unit, index, filter)
+                if not Registry.adopted[self_] or not PTT.Config.enabled then return end
+                -- SetUnitBuff/SetUnitDebuff accept an extra filter such as
+                -- "PLAYER" that narrows rather than replaces the helpful/harmful
+                -- side, so the side is prefixed rather than overridden.
+                local combined = filter
+                if defaultFilter then
+                    combined = filter and (defaultFilter .. "|" .. filter) or defaultFilter
+                end
+                ShowSpellID(self_, AuraSpellID(unit, index, combined))
+            end)
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
 -- Wiring
 --------------------------------------------------------------------------------
 
@@ -237,22 +383,39 @@ function Content:Initialize()
 
     Registry:OnCleared(function(tooltip)
         HideIcon(tooltip)
+        filled[tooltip] = nil
         if tooltip == _G.GameTooltip then tooltip.peaversUnit = nil end
     end)
 
     local processor = _G.TooltipDataProcessor
     local types = _G.Enum and _G.Enum.TooltipDataType
-    if not processor or not processor.AddTooltipPostCall or not types then return end
 
-    local function Register(dataType, handler)
-        if dataType == nil then return end
-        processor.AddTooltipPostCall(dataType, handler)
+    -- The capability, not the client flavour, picks the route. Anniversary and
+    -- Mists report themselves as Classic but have the processor, and they get
+    -- the same route retail does.
+    if processor and type(processor.AddTooltipPostCall) == "function"
+        and types and types.Unit ~= nil then
+        self.route = "postcall"
+
+        local function Register(dataType, handler)
+            if dataType == nil then return end
+            processor.AddTooltipPostCall(dataType, handler)
+        end
+
+        Register(types.Unit, function(tooltip) Content:OnUnit(tooltip) end)
+        Register(types.Item, function(tooltip, data) Content:OnItem(tooltip, data) end)
+        Register(types.Spell, function(tooltip, data) Content:OnSpell(tooltip, data) end)
+        Register(types.UnitAura, function(tooltip, data) Content:OnSpell(tooltip, data) end)
+        return
     end
 
-    Register(types.Unit, function(tooltip) Content:OnUnit(tooltip) end)
-    Register(types.Item, function(tooltip, data) Content:OnItem(tooltip, data) end)
-    Register(types.Spell, function(tooltip, data) Content:OnSpell(tooltip, data) end)
-    Register(types.UnitAura, function(tooltip, data) Content:OnSpell(tooltip, data) end)
+    -- No processor. OnAdopt replays every tooltip adopted so far and then runs
+    -- for each one adopted later through the SharedTooltip_SetBackdropStyle
+    -- hook, so a load-on-demand tooltip gets its scripts hooked the first time
+    -- it shows, by the same code that hooked GameTooltip at login. HookScripts
+    -- remembers what it has hooked, so neither route can hook a tooltip twice.
+    self.route = "scripts"
+    Registry:OnAdopt(HookScripts)
 end
 
 return Content

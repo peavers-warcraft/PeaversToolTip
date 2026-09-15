@@ -139,7 +139,12 @@ end
 
 local AbbreviateNumbers = _G.AbbreviateNumbers or _G.AbbreviateLargeNumbers
 local RoundToNearestString = _G.C_StringUtil and _G.C_StringUtil.RoundToNearestString
-local ScaleTo100 = _G.CurveConstants and _G.CurveConstants.ScaleTo100
+-- ScaleTo100 makes UnitHealthPercent report 0-100 rather than 0-1. The Classic
+-- clients carry UnitHealthPercent, but CurveConstants is not guaranteed there,
+-- and passing nil for the curve risks a 0-1 answer that PercentText would round
+-- to "1%" at full health. Falling back to `true`, which the curve argument
+-- accepts as "use the default curve", is the same choice PeaversUnitFrames makes.
+local ScaleTo100 = (_G.CurveConstants and _G.CurveConstants.ScaleTo100) or true
 
 -- A 0-100 percentage, frequently secret. Display only, never compared.
 function Secret.GetHealthPercent(unit)

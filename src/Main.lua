@@ -6,7 +6,10 @@ local Utils = PeaversCommons.Utils
 
 -- Initialize addon namespace
 PTT.name = addonName
-PTT.version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "1.0.0"
+-- C_AddOns is not guaranteed on the Classic clients; the old global is the same
+-- call under its pre-namespace name.
+local GetAddOnMetadata = (_G.C_AddOns and _G.C_AddOns.GetAddOnMetadata) or _G.GetAddOnMetadata
+PTT.version = (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version")) or "1.0.0"
 
 -- Register slash commands
 PeaversCommons.SlashCommands:Register(addonName, "ptt", {
