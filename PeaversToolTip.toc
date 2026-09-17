@@ -1,4 +1,4 @@
-## Interface: 11509, 20506, 50504, 120001, 120005, 120007, 120100
+## Interface: 11509, 16001, 20506, 50504, 120001, 120005, 120007, 120100
 
 ## Title: |cff3abdf7Peavers|rToolTip
 ## Notes: Flat black-box tooltips with a hairline border that colours itself by item quality or unit reaction
