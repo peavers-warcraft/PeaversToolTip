@@ -43,11 +43,11 @@ local Skin = PTT.Skin
 
 local Safe, SafeBool, Present = Secret.Safe, Secret.SafeBool, Secret.Present
 
--- These moved into C_Item over the 10.x-11.x cycle. Resolving both keeps the
--- addon loadable on whichever of the supported interface versions is running.
-local GetItemInfo = (_G.C_Item and _G.C_Item.GetItemInfo) or _G.GetItemInfo
-local GetItemQualityColor = (_G.C_Item and _G.C_Item.GetItemQualityColor) or _G.GetItemQualityColor
-local GetItemQualityByID = _G.C_Item and _G.C_Item.GetItemQualityByID
+-- C_Item carries all three on every interface version the TOC declares; the
+-- legacy globals are deprecated.
+local GetItemInfo = C_Item.GetItemInfo
+local GetItemQualityColor = C_Item.GetItemQualityColor
+local GetItemQualityByID = C_Item.GetItemQualityByID
 
 local LABEL = "|cff949494%s|r"
 
@@ -185,7 +185,7 @@ local function ItemQuality(data)
     if not link then return nil end
 
     local quality = Safe(function() return select(3, GetItemInfo(link)) end)
-    if quality == nil and GetItemQualityByID and data.id then
+    if quality == nil and data.id then
         quality = Safe(GetItemQualityByID, data.id)
     end
 
@@ -198,7 +198,7 @@ function Content:OnItem(tooltip, data)
     if not Registry.adopted[tooltip] then return end
     if not PTT.Config.enabled then return end
 
-    if PTT.Config.borderByQuality and GetItemQualityColor then
+    if PTT.Config.borderByQuality then
         local quality = ItemQuality(data)
         if quality then
             local r, g, b = Safe(GetItemQualityColor, quality)
