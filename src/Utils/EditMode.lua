@@ -270,6 +270,7 @@ function EditMode:Register()
             frame:RegisterForDrag()
             frame:SetScript("OnDragStart", nil)
             frame:SetScript("OnDragStop", nil)
+            PTT.Anchor:SetEditModeLook(true)
             -- Shown whatever the anchor mode is: it is the only handle on this
             -- addon in Edit Mode, and a tooltip that follows the cursor still
             -- has colours and a health bar to configure.
@@ -277,6 +278,7 @@ function EditMode:Register()
         end,
 
         onExit = function(frame)
+            PTT.Anchor:SetEditModeLook(false)
             frame:SetFrameStrata("TOOLTIP")
             frame:RegisterForDrag("LeftButton")
             frame:SetScript("OnDragStart", function(self_) self_:StartMoving() end)
