@@ -55,6 +55,7 @@ function Anchor:GetMover()
     label:SetPoint("CENTER")
     label:SetText("Tooltip anchor")
     label:SetTextColor(0.725, 0.725, 0.725)
+    mover.label = label
 
     mover:SetScript("OnDragStart", function(self_) self_:StartMoving() end)
     mover:SetScript("OnDragStop", function(self_)
@@ -96,6 +97,23 @@ function Anchor:SetUnlocked(unlocked)
 
     mover:EnableMouse(unlocked and true or false)
     if unlocked then mover:Show() else mover:Hide() end
+end
+
+-- While Edit Mode owns the mover its own box and caption go. Blizzard's
+-- selection overlay is the handle there and prints the name itself, and a dark
+-- box with an indigo edge underneath it is two looks for one frame.
+function Anchor:SetEditModeLook(editing)
+    local mover = self:GetMover()
+
+    if editing then
+        PTT.Skin:HideBox(mover)
+    else
+        PTT.Skin:ShowBox(mover)
+    end
+
+    if mover.label then
+        mover.label:SetShown(not editing)
+    end
 end
 
 function Anchor:ToggleUnlocked()
